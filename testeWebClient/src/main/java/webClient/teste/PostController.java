@@ -55,13 +55,19 @@ public class PostController {
 	}
 
 	@PutMapping("/{id}")
-	public ResponseEntity<Mono<Post>> putMethodName(@PathVariable Integer id) {
+	public Mono<ResponseEntity<String>> putMethodName(@PathVariable Integer id) {
 		Post postObj = new Post(1, id, "titleTeste", "bodyTeste");
-
-		Mono<Post> post = postService.update(id, postObj);
-		post.subscribe(System.out::println);
-
-		return ResponseEntity.status(HttpStatus.OK).body(post);
+		
+		return postService.findById(id)
+		        .flatMap(post -> postService.update(id, postObj)
+		            .then(Mono.just(ResponseEntity.status(HttpStatus.OK).body("Updated post id: " + post.id()))))
+		        .onErrorResume(e ->{
+		        	if (e instanceof WebClientResponseException.NotFound) {
+		                return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body("Not found"));
+		            } else {
+		                return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred"));
+		            }
+		        });
 	}
 
 	@DeleteMapping("/{id}")
@@ -69,7 +75,6 @@ public class PostController {
 		return postService.findById(id)
 		        .flatMap(post -> postService.delete(id)
 		            .then(Mono.just(ResponseEntity.status(HttpStatus.OK).body("Deleted post id: " + post.id()))))
-		        .switchIfEmpty(Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body("Not found")))
 		        .onErrorResume(e ->{
 		        	if (e instanceof WebClientResponseException.NotFound) {
 		                return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body("Not found"));
