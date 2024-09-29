@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import reactor.core.publisher.Flux;
 import reactor.core.publisher.Mono;
@@ -21,7 +22,7 @@ public class PostController {
 
 	@Autowired
 	PostService postService;
-
+	
 	@GetMapping
 	public ResponseEntity<Flux<Post>> getAll() {
 		Flux<Post> posts = postService.findAll();
@@ -33,7 +34,12 @@ public class PostController {
 	@GetMapping("/{id}")
 	public ResponseEntity<Mono<Post>> getById(@PathVariable Integer id) {
 		Mono<Post> post = postService.findById(id);
-		post.subscribe(System.out::println);
+		post.subscribe(p -> {
+			System.out.println("userId: " + p.userId());
+			System.out.println("Id: " + p.id());
+			System.out.println("title: " + p.title());
+			System.out.println("body: " + p.body());
+		});
 
 		return ResponseEntity.status(HttpStatus.OK).body(post);
 	}
@@ -59,18 +65,17 @@ public class PostController {
 	}
 
 	@DeleteMapping("/{id}")
-	public ResponseEntity<Mono<Post>> deleteMethodName(@PathVariable Integer id) {
-		Mono<Post> post = postService.findById(id);
-
-		post.subscribe(p -> {
-			System.out.println("userId: " + p.userId());
-			System.out.println("Id: " + p.id());
-			System.out.println("title: " + p.title());
-			System.out.println("body: " + p.body());
-		});
-
-		postService.delete(id);
-
-		return ResponseEntity.status(HttpStatus.OK).body(post);
+	public Mono<ResponseEntity<String>> deleteMethodName(@PathVariable Integer id) {
+		return postService.findById(id)
+		        .flatMap(post -> postService.delete(id)
+		            .then(Mono.just(ResponseEntity.status(HttpStatus.OK).body("Deleted post id: " + post.id()))))
+		        .switchIfEmpty(Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body("Not found")))
+		        .onErrorResume(e ->{
+		        	if (e instanceof WebClientResponseException.NotFound) {
+		                return Mono.just(ResponseEntity.status(HttpStatus.NOT_FOUND).body("Not found"));
+		            } else {
+		                return Mono.just(ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body("An error occurred"));
+		            }
+		        });
 	}
 }

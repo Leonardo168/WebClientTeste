@@ -13,6 +13,7 @@ public class PostService {
 	
 	public PostService(WebClient.Builder builder) {
 		webClient = builder.baseUrl("https://jsonplaceholder.typicode.com/").build();
+		//webClient = builder.baseUrl("https://webhook.site/32a8bcb4-bcaf-43f6-823c-e63a92e5d8ef").build();
 	}
 	
 	public Flux<Post> findAll(){
